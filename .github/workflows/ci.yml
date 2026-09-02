@@ -20,3 +20,16 @@ jobs:
           cache: 'npm'
       - run: npm ci
       - run: npm run verify
+
+      # dist/ is committed, because Yarn Classic does not run `prepare` for git dependencies
+      # and would otherwise install source with no build output. That makes a stale dist/ a
+      # real failure mode - consumers would silently get the previous build. `npm run verify`
+      # above rebuilds it, so a diff here means the commit omitted the rebuild.
+      - name: Check committed dist/ matches the source
+        run: |
+          if ! git diff --quiet -- dist; then
+            echo "::error::dist/ is out of date. Run 'npm run build' and commit the result."
+            git diff --stat -- dist
+            exit 1
+          fi
+          echo "dist/ is up to date."

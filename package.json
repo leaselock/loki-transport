@@ -1,6 +1,6 @@
 {
   "name": "@leaselock/loki-transport",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Winston transport that batches log lines and pushes them to Grafana Loki",
   "private": false,
   "main": "./dist/index.js",
@@ -30,8 +30,7 @@
     "test": "vitest --run",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "verify": "npm run format:check && npm run type_check && npm run test && npm run build",
-    "prepare": "npm run build"
+    "verify": "npm run format:check && npm run type_check && npm run test && npm run build"
   },
   "dependencies": {
     "axios": "^1.7.0",
