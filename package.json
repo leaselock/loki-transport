@@ -1,0 +1,52 @@
+{
+  "name": "@leaselock/loki-transport",
+  "version": "0.2.0",
+  "description": "Winston transport that batches log lines and pushes them to Grafana Loki",
+  "private": false,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.mts",
+        "default": "./dist/index.mjs"
+      },
+      "require": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      }
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "build": "tsup",
+    "type_check": "tsc --noEmit",
+    "test": "vitest --run",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "verify": "npm run format:check && npm run type_check && npm run test && npm run build",
+    "prepare": "npm run build"
+  },
+  "dependencies": {
+    "axios": "^1.7.0",
+    "json-stringify-safe": "^5.0.1"
+  },
+  "peerDependencies": {
+    "winston-transport": ">=4.7.0"
+  },
+  "devDependencies": {
+    "@types/json-stringify-safe": "^5.0.3",
+    "@types/node": "^24.0.0",
+    "prettier": "^3.3.3",
+    "tsup": "^8.3.0",
+    "typescript": "^5.6.2",
+    "vitest": "^2.1.0",
+    "winston-transport": "^4.9.0"
+  }
+}
