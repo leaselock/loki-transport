@@ -48,6 +48,17 @@ function splitEvery(size, list) {
   }
   return chunks;
 }
+function resolveSafely(resolve, optionName) {
+  if (!resolve) return void 0;
+  try {
+    return resolve();
+  } catch (error) {
+    console.error(`Loki transport: ${optionName} threw; continuing without it`, {
+      reason: error instanceof Error ? error.message : "unknown"
+    });
+    return void 0;
+  }
+}
 function nextCause(error, keys) {
   for (const key of keys) {
     const candidate = error[key];
@@ -216,8 +227,8 @@ var LokiTransport = class extends Transport {
         if (!this.stripFields.has(key)) passthrough[key] = value;
       }
     }
-    const context = this.getContext ? { context: this.getContext() ?? {} } : void 0;
-    const extraFields = this.getExtraFields?.();
+    const context = this.getContext ? { context: resolveSafely(this.getContext, "getContext") ?? {} } : void 0;
+    const extraFields = resolveSafely(this.getExtraFields, "getExtraFields");
     const nestedErrorStack = buildNestedErrorStack(lineError, this.causeKeys);
     const fullLineObj = {
       level,

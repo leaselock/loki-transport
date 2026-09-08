@@ -446,3 +446,51 @@ describe('flushOnEnd', () => {
     expect(transport.pendingCount).toBe(0);
   });
 });
+
+describe('misbehaving consumer callbacks', () => {
+  // The transport promises that logging can never break the caller. getContext and
+  // getExtraFields are arbitrary consumer functions run on every line, so they are the one
+  // place that guarantee could leak.
+
+  it('log() survives a getContext that throws, and still emits an empty context', async () => {
+    const transport = makeTransport({
+      loggerId: 'fixed-id',
+      lineFormat: LEGACY_LINE_FORMAT,
+      getContext: () => {
+        throw new Error('store unavailable');
+      },
+    });
+
+    const line = await lineFor(transport, { level: 'info', message: 'x' });
+
+    expect(line.context).toEqual({});
+    expect(line.message).toBe('x');
+  });
+
+  it('log() survives a getExtraFields that throws, and omits the fields', async () => {
+    const transport = makeTransport({
+      loggerId: 'fixed-id',
+      getExtraFields: () => {
+        throw new Error('metadata endpoint down');
+      },
+    });
+
+    const line = await lineFor(transport, { level: 'info', message: 'x' });
+
+    expect(line.message).toBe('x');
+    expect(line.loggerId).toBe('fixed-id');
+  });
+
+  it('does not throw synchronously out of log()', () => {
+    const transport = makeTransport({
+      getContext: () => {
+        throw new Error('boom');
+      },
+      getExtraFields: () => {
+        throw new Error('boom');
+      },
+    });
+
+    expect(() => transport.log({ level: 'info', message: 'x' }, () => {})).not.toThrow();
+  });
+});

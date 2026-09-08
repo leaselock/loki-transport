@@ -184,6 +184,29 @@ function splitEvery<T>(size: number, list: Array<T>): Array<Array<T>> {
   return chunks;
 }
 
+/**
+ * Runs a caller-supplied resolver and swallows anything it throws.
+ *
+ * `getContext` and `getExtraFields` are arbitrary consumer functions called on every line.
+ * Left unguarded, one of them throwing would propagate out of `log()` and into whatever
+ * called `logger.info(...)` - so a logging statement could take down application code. Every
+ * other failure path here is contained; these have to be too.
+ */
+function resolveSafely(
+  resolve: (() => Record<string, unknown> | undefined) | undefined,
+  optionName: string
+): Record<string, unknown> | undefined {
+  if (!resolve) return undefined;
+  try {
+    return resolve();
+  } catch (error) {
+    console.error(`Loki transport: ${optionName} threw; continuing without it`, {
+      reason: error instanceof Error ? error.message : 'unknown',
+    });
+    return undefined;
+  }
+}
+
 /** First of `keys` that holds an Error on `error`, or undefined. */
 function nextCause(error: Error, keys: Array<string>): unknown {
   for (const key of keys) {
@@ -418,8 +441,11 @@ export class LokiTransport extends Transport {
       }
     }
 
-    const context = this.getContext ? { context: this.getContext() ?? {} } : undefined;
-    const extraFields = this.getExtraFields?.();
+    // Both are consumer-supplied; see resolveSafely. A resolver that throws must not be able
+    // to break the caller's logging statement, so `context` still gets its `{}` and
+    // `extraFields` is simply omitted.
+    const context = this.getContext ? { context: resolveSafely(this.getContext, 'getContext') ?? {} } : undefined;
+    const extraFields = resolveSafely(this.getExtraFields, 'getExtraFields');
     const nestedErrorStack = buildNestedErrorStack(lineError, this.causeKeys);
 
     // One field order for every service, so a single set of Grafana queries covers all of
