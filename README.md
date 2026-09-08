@@ -178,8 +178,3 @@ npm run verify      # format:check + type_check + test + build
 ```
 
 The test suite mocks the network entirely, so it needs no Loki instance.
-
-## License
-
-UNLICENSED - internal use only. Publicly visible for install convenience; no rights to
-use, copy or distribute are granted.
