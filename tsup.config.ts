@@ -2,8 +2,8 @@ import { defineConfig } from 'tsup';
 
 export default defineConfig({
   entry: ['src/index.ts'],
-  // Consumers span both module systems: leaselock-ingestion and ll-private are CommonJS,
-  // ingestdb's admin_ui is ESM. Ship both rather than forcing an interop shim on either.
+  // Consumers span both module systems - some CommonJS, some ESM - so ship both rather than
+  // forcing an interop shim on either.
   format: ['cjs', 'esm'],
   dts: true,
   sourcemap: true,
