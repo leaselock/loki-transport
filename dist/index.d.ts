@@ -50,10 +50,14 @@ declare const LEGACY_LINE_FORMAT: LokiLineFormatOptions;
 type LokiTransportOptions = {
     /** Base URL of the Loki write endpoint, e.g. `http://loki.internal:3100`. Trailing slashes are stripped. */
     host: string;
-    /** Basic-auth username sent with every push. */
-    lokiUser: string;
-    /** Basic-auth password/token sent with every push. */
-    lokiToken: string;
+    /**
+     * Basic-auth username. Optional, and only sent when both this and `lokiToken` are given -
+     * a Loki running with `auth_enabled: false` behind a private endpoint ignores the header
+     * entirely, so many deployments have nothing meaningful to put here.
+     */
+    lokiUser?: string;
+    /** Basic-auth password/token. See {@link LokiTransportOptions.lokiUser}. */
+    lokiToken?: string;
     /** Minimum winston level this transport accepts. Pass the same level as the logger to mirror it exactly. */
     level: string;
     /** Stream labels applied to every line. Keep cardinality low; put high-cardinality data in the log body. */

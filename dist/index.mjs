@@ -143,14 +143,18 @@ var LokiTransport = class extends Transport {
   FLUSH_TIMEOUT_MS = 5e3;
   constructor(opts) {
     super(opts);
-    if (!opts.host || !opts.lokiUser || !opts.lokiToken) {
-      throw new Error("Loki host, user, and token are required");
+    if (!opts.host) {
+      throw new Error("Loki host is required");
     }
     this.setMaxListeners(0);
     this.host = opts.host.replace(/\/+$/, "");
     this.labels = opts.labels;
     this.debug = opts.debug ?? false;
-    this.authHeader = `Basic ${Buffer.from(`${opts.lokiUser}:${opts.lokiToken}`).toString("base64")}`;
+    if (opts.lokiUser && opts.lokiToken) {
+      this.authHeader = `Basic ${Buffer.from(`${opts.lokiUser}:${opts.lokiToken}`).toString("base64")}`;
+    } else if (opts.lokiUser || opts.lokiToken) {
+      console.warn("Loki transport: only one of lokiUser/lokiToken was supplied; sending no auth header");
+    }
     this.loggerId = opts.loggerId ?? process.env.LOGGER_ID ?? randomUUID();
     process.env.LOGGER_ID = this.loggerId;
     this.getContext = opts.getContext;
@@ -465,7 +469,7 @@ var LokiTransport = class extends Transport {
         headers: {
           "Content-Type": "application/json",
           "Content-Encoding": "gzip",
-          Authorization: this.authHeader
+          ...this.authHeader && { Authorization: this.authHeader }
         },
         timeout: this.FLUSH_TIMEOUT_MS,
         httpAgent,

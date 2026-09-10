@@ -61,12 +61,13 @@ afterEach(async () => {
 });
 
 describe('constructor', () => {
-  it.each([
-    ['host', { host: '' }],
-    ['lokiUser', { lokiUser: '' }],
-    ['lokiToken', { lokiToken: '' }],
-  ])('throws when %s is missing', (_name, override) => {
-    expect(() => makeTransport(override)).toThrow('Loki host, user, and token are required');
+  it('throws when host is missing', () => {
+    expect(() => makeTransport({ host: '' })).toThrow('Loki host is required');
+  });
+
+  it.each([['lokiUser'], ['lokiToken']])('does NOT throw when %s is missing', (field) => {
+    // A Loki with auth_enabled: false ignores the header, so credentials are optional.
+    expect(() => makeTransport({ [field]: undefined })).not.toThrow();
   });
 
   it('strips trailing slashes from the host so the push URL has no double slash', async () => {
@@ -492,5 +493,55 @@ describe('misbehaving consumer callbacks', () => {
     });
 
     expect(() => transport.log({ level: 'info', message: 'x' }, () => {})).not.toThrow();
+  });
+});
+
+describe('optional credentials', () => {
+  const authHeaderOf = () => {
+    const config = vi.mocked(axios.post).mock.calls[0]?.[2] as { headers: Record<string, string> };
+    return config.headers.Authorization;
+  };
+
+  it('sends no Authorization header when neither credential is given', async () => {
+    const transport = makeTransport({ lokiUser: undefined, lokiToken: undefined });
+    await logSync(transport, { level: 'info', message: 'x' });
+    await transport.flush();
+
+    expect(authHeaderOf()).toBeUndefined();
+    // The push still happens - that is the whole point.
+    expect(axios.post).toHaveBeenCalledOnce();
+  });
+
+  it('still sends the header when both are given', async () => {
+    const transport = makeTransport();
+    await logSync(transport, { level: 'info', message: 'x' });
+    await transport.flush();
+
+    expect(authHeaderOf()).toBe(`Basic ${Buffer.from('user:token').toString('base64')}`);
+  });
+
+  it.each([
+    ['only lokiUser', { lokiToken: undefined }],
+    ['only lokiToken', { lokiUser: undefined }],
+  ])('sends no header and warns when %s is given', async (_name, override) => {
+    const warn = vi.spyOn(console, 'warn');
+    const transport = makeTransport(override);
+    await logSync(transport, { level: 'info', message: 'x' });
+    await transport.flush();
+
+    // Half a credential pair is a config mistake, not a deliberate no-auth setup.
+    expect(authHeaderOf()).toBeUndefined();
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('only one of lokiUser/lokiToken'));
+  });
+
+  it('emits the same line whether or not credentials are supplied', async () => {
+    const withAuth = makeTransport({ loggerId: 'fixed' });
+    const lineA = await lineFor(withAuth, { level: 'info', message: 'x', timestamp: '2026-01-01T00:00:00.000Z' });
+
+    vi.mocked(axios.post).mockClear();
+    const withoutAuth = makeTransport({ loggerId: 'fixed', lokiUser: undefined, lokiToken: undefined });
+    const lineB = await lineFor(withoutAuth, { level: 'info', message: 'x', timestamp: '2026-01-01T00:00:00.000Z' });
+
+    expect(lineB).toEqual(lineA);
   });
 });

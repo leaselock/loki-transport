@@ -67,10 +67,14 @@ export const LEGACY_LINE_FORMAT: LokiLineFormatOptions = {
 export type LokiTransportOptions = {
   /** Base URL of the Loki write endpoint, e.g. `http://loki.internal:3100`. Trailing slashes are stripped. */
   host: string;
-  /** Basic-auth username sent with every push. */
-  lokiUser: string;
-  /** Basic-auth password/token sent with every push. */
-  lokiToken: string;
+  /**
+   * Basic-auth username. Optional, and only sent when both this and `lokiToken` are given -
+   * a Loki running with `auth_enabled: false` behind a private endpoint ignores the header
+   * entirely, so many deployments have nothing meaningful to put here.
+   */
+  lokiUser?: string;
+  /** Basic-auth password/token. See {@link LokiTransportOptions.lokiUser}. */
+  lokiToken?: string;
   /** Minimum winston level this transport accepts. Pass the same level as the logger to mirror it exactly. */
   level: string;
   /** Stream labels applied to every line. Keep cardinality low; put high-cardinality data in the log body. */
@@ -293,7 +297,7 @@ export class LokiTransport extends Transport {
   private timer: NodeJS.Timeout;
   private labels: Record<string, string>;
   private host: string;
-  private authHeader: string;
+  private authHeader: string | undefined;
   private debug: boolean;
   private loggerId: string;
   private flushPromise: Promise<void> | null = null;
@@ -318,8 +322,8 @@ export class LokiTransport extends Transport {
 
   constructor(opts: LokiTransportOptions) {
     super(opts);
-    if (!opts.host || !opts.lokiUser || !opts.lokiToken) {
-      throw new Error('Loki host, user, and token are required');
+    if (!opts.host) {
+      throw new Error('Loki host is required');
     }
 
     // One transport is shared by every logger, and winston pipes each one into it. With 20+
@@ -330,7 +334,11 @@ export class LokiTransport extends Transport {
     this.host = opts.host.replace(/\/+$/, '');
     this.labels = opts.labels;
     this.debug = opts.debug ?? false;
-    this.authHeader = `Basic ${Buffer.from(`${opts.lokiUser}:${opts.lokiToken}`).toString('base64')}`;
+    if (opts.lokiUser && opts.lokiToken) {
+      this.authHeader = `Basic ${Buffer.from(`${opts.lokiUser}:${opts.lokiToken}`).toString('base64')}`;
+    } else if (opts.lokiUser || opts.lokiToken) {
+      console.warn('Loki transport: only one of lokiUser/lokiToken was supplied; sending no auth header');
+    }
 
     // Keep a stable ID per container/process; child processes inherit it via env var.
     this.loggerId = opts.loggerId ?? process.env.LOGGER_ID ?? randomUUID();
@@ -743,7 +751,7 @@ export class LokiTransport extends Transport {
         headers: {
           'Content-Type': 'application/json',
           'Content-Encoding': 'gzip',
-          Authorization: this.authHeader,
+          ...(this.authHeader && { Authorization: this.authHeader }),
         },
         timeout: this.FLUSH_TIMEOUT_MS,
         httpAgent,
